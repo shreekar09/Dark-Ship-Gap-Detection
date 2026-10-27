@@ -1,0 +1,49 @@
+services:
+  # Main pipeline. Arguments after the service name are passed to run_pipeline.py:
+  #   docker compose run --rm pipeline --input "data/raw/AIS_2026_06_*.csv.zst"
+  pipeline:
+    build: .
+    image: ais-dark-gap-detector
+    # Write files as your own user so ./outputs and ./data aren't root-owned on Linux.
+    # (On macOS/Windows Docker Desktop this is harmless.)
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      - ./data:/app/data
+      - ./outputs:/app/outputs
+    environment:
+      # Cap DuckDB below the RAM you gave Docker (Docker Desktop > Settings > Resources).
+      DUCKDB_MEMORY_LIMIT: "${DUCKDB_MEMORY_LIMIT:-6GB}"
+
+  # Interactive DuckDB shell over your data and results (official CLI binary, same version as the Python package):
+  #   docker compose run --rm duckdb -init sql/explore.sql
+  #   docker compose run --rm duckdb -c "SELECT count(*) FROM read_parquet('outputs/clean_pings.parquet')"
+  duckdb:
+    build:
+      context: .
+      dockerfile: docker/duckdb.Dockerfile
+    image: ais-duckdb
+    user: "${UID:-1000}:${GID:-1000}"
+    working_dir: /work
+    stdin_open: true
+    tty: true
+    environment:
+      HOME: /tmp          # CLI writes its history file here; the non-root user needs a writable home
+    volumes:
+      - ./data:/work/data:ro
+      - ./outputs:/work/outputs:ro
+      - ./sql:/work/sql:ro
+
+  # Download NOAA daily files into ./data/raw:  docker compose run --rm download 2023-01-15 2
+  download:
+    image: ais-dark-gap-detector
+    build: .
+    user: "${UID:-1000}:${GID:-1000}"
+    entrypoint: ["python", "-m", "ais_gap.download"]
+    volumes:
+      - ./data:/app/data
+
+  # Unit tests:  docker compose run --rm test
+  test:
+    image: ais-dark-gap-detector
+    build: .
+    entrypoint: ["python", "-m", "pytest", "-q", "tests"]

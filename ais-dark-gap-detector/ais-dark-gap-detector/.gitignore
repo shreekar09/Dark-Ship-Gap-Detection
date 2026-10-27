@@ -1,0 +1,7 @@
+data/raw/*
+!data/raw/.gitkeep
+data/ref/*.geojson
+outputs/*
+__pycache__/
+.pytest_cache/
+.venv/

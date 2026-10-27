@@ -1,0 +1,9 @@
+data/raw
+data/ref
+outputs
+**/__pycache__
+.pytest_cache
+.venv
+.deps
+.git
+*.zip
